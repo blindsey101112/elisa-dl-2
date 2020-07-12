@@ -4,6 +4,7 @@ def get_ods(file):
     wb = load_workbook(file)
     od_ws = wb["Photometric1"]
     ods={}
+    pos={}
     for cell in od_ws["H23":"J23"][0]:
         pos[cell.coordinate] = cell.value
     ods["pos"] = pos

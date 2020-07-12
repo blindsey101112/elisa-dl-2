@@ -7,38 +7,6 @@ from scipy.optimize import leastsq
 import pdfkit
 import datetime
 
-'''
-Credit to https://people.duke.edu/~ccc14/pcfb/analysis.html for the code to fit 
-the 4 parameter logistic regression for the standard curve
-'''
-
-def logistic4(x, A, B, C, D):
-    """4PL logistic equation. Returns OD (y) based on with standard concentration (x) """
-    step1 = A-D
-    step2 = x/C
-    step3 = np.sign(step2) * (np.abs(step2)) ** B
-    log_output = (step1/(1.0 + step3) + D)
-    return log_output
-
-def residuals(p, y, x):
-    """Deviations of data from fitted 4PL curve"""
-    A,B,C,D = p
-    err = y-logistic4(x, A, B, C, D)
-    return err
-
-def peval(x, p):
-    """Evaluated value at x with current parameters."""
-    A,B,C,D = p
-    return logistic4(x, A, B, C, D)
-
-def get_conc(y, p):
-    """returns concentraion (x) with OD (y) input"""
-    A,B,C,D = p
-    step1 = ((A-D)/(y-D)) - 1
-    step2 = np.sign(step1) * (np.abs(step1)) ** (1/B)
-    concentration = step2 * C
-    return concentration
-
 def mean_cv(group):
     """returns mean and cv of a group of wells"""
     group_ods = np.asarray(list(ods[group].values()))
@@ -46,12 +14,6 @@ def mean_cv(group):
     group_sd = np.std(group_ods)
     group_cv = group_sd / group_mean
     return [group_mean, group_cv]
-
-std_concs = [1000, 571.4285714, 326.5306122, 186.5889213, 106.6222407, 60.9269947,
-             34.81542555, 19.89452888, 11.36830222, 6.496172697, 3.712098684, 2.121199248]
-
-std_curve1_cells = ["B23", "C23", "D23", "E23", "F23", "G23", "H23", "I23", "J23", "K23", "L23", "M23"]
-std_curve2_cells = ["B24", "C24", "D24", "E24", "F24", "G24", "H24", "I24", "J24", "K24", "L24", "M24"]
 
 antigens = {"s" : "Spike", "n" : "Nucleocapsid"}
 
@@ -64,6 +26,7 @@ if __name__ == "__main__":
     plate_id = sys.argv[1]
     antigen = sys.argv[2]
 
+    #read in input files
     plateplan_file = plate_id + "-pplan.xlsx"
     platereader_file = plate_id + "-preader.xlsx"
     ignore_file = plate_id + "-ignore.csv"
@@ -72,18 +35,15 @@ if __name__ == "__main__":
 
     print("Found plateplan file: %s" % plateplan_file)
     print("Found plate reader file: %s" % platereader_file)
-
     if ignore_file in os.listdir():
         print("Found ignore file: %s" % ignore_file)
-
     print("Antigen: %s" % antigens[antigen])
 
     np.set_printoptions(suppress=True) #suppresses scientific display of numbers
 
-### remove bad wells using ignore file ###
+### read bad wells from ignore file ###
     badwells = []
     badwells_group = []
-
     if ignore_file in os.listdir():
         with open(ignore_file) as infile:
             for line in infile:
@@ -92,127 +52,115 @@ if __name__ == "__main__":
                 badwells.append(badwell)
                 badwells_group.append(group)
 
-    #if not in standard curve will delete. If in standard curve will take other standard OD.
-    for group in list(ods.keys()):
-        for well in list(ods[group].keys()):
-            if well in badwells:
-                if well not in std_curve1_cells and well not in std_curve2_cells:
-                    del ods[group][well]
-                else:
-                    if well in std_curve1_cells:
-                        alternate_well = well[0:2] + "4"
-                        ods[group][well] = ods["std_curve2"][alternate_well]
-                    if well in std_curve2_cells:
-                        alternate_well = well[0:2] + "3"
-                        ods[group][well] = ods["std_curve1"][alternate_well]
+### get list of sample ids
+    sample_ids = {}
+    for num in range(1,8):
+        sample_num = "sample0%s" % str(num)
+        inputed_ids = []
+        for dilution in sample_dilution[sample_num].values():
+            if dilution.split("-")[0] not in inputed_ids:
+                inputed_ids.append(dilution.split("-")[0])
+        if len(inputed_ids) != 1:
+            print("Inputting error with sampleID: %s %s" % (sample_num, inputed_ids))
+        sample_ids[sample_num] = inputed_ids[0]
 
-##calculate CV for samples before blank subtracting
-    sample_cv = {}
-    for sample in ods.keys():
-        if "sample" in sample:
-            sample_ods = np.asarray(list(ods[sample].values()))
-            mean = sum(sample_ods)/len(sample_ods)
-            sd = np.std(sample_ods)
-            cv = sd/mean
-            sample_cv[sample] = round(cv, 2)
-
-
-### subtract mean of blanks from all wells ###
+### calculate CVs, subtract blanks from ODs and calculate mean for samples
+    cvs = {}
+    dilution_ods = {}
     blk_mean = mean_cv("blk")[0]
     blk_cv = mean_cv("blk")[1]
+    for group in list(ods.keys()):
+        if "sample" in group:
+            if "_1" in group:
+                for well in ods[group].keys():
+                    column = int(well[1:4])
+                    row = well[0:1]
+                    duplicates = [well, row + str(column+1)]
+                    duplicate_ods = []
+                    sample_no = group[0:8]
+                    id = sample_dilution[sample_no][well].split("-")[0]
+                    dilution = sample_dilution[group[0:8]][well].split("-")[1]
+                    for duplicate in duplicates:
+                        if duplicates.index(duplicate) == 0:
+                            duplicate_ods.append(ods[sample_no + "_1"][duplicate])
+                        if duplicates.index(duplicate) == 1:
+                            duplicate_ods.append(ods[sample_no + "_2"][duplicate])
+                        if duplicate in badwells:
+                            bad_duplicate = duplicates.index(duplicate)
+                            del duplicate_ods[bad_duplicate]
+                            duplicates.remove(duplicate)
+                        np_ods = np.asarray(duplicate_ods)
+                        duplicate_mean = sum(np_ods) / len(np_ods)
+                        duplicate_sd = np.std(np_ods)
+                        duplicate_cv = duplicate_sd / duplicate_mean
+                    if id not in cvs.keys():
+                        cvs[id] = {}
+                    cvs[id][dilution] = round(duplicate_cv, 3)
+                    for duplicate in duplicate_ods:
+                        index = duplicate_ods.index(duplicate)
+                        duplicate_ods[index] = duplicate - blk_mean
+                    if id not in dilution_ods.keys():
+                        dilution_ods[id] = {}
+                    np_ods_blk = np.asarray(duplicate_ods)
+                    duplicate_blk_mean = sum(np_ods_blk) / len(np_ods_blk)
+                    dilution_ods[id][dilution] = duplicate_blk_mean
+            if "_2" in group:
+                continue
+        else:
+            for well in list(ods[group].keys()):
+                if well in badwells:
+                    del ods[group][well]
+            group_cv = mean_cv(group)[1]
+            cvs[group] = round(group_cv, 3)
 
-    for group in ods.keys():
-        for well in ods[group].keys():
-            minblk_od = ods[group][well] - blk_mean
-            ods[group][well] = minblk_od
+### qc check and determine endpoint dilution
+    endpoint_dilution = {}
+    endpoint_error = {}
+    high_low = {}
+    for sample in sample_ids:
+        sample_cvs = cvs[sample_ids[sample]]
+        sample_ods = dilution_ods[sample_ids[sample]]
+        cut_off = cut_offs[antigen]
+        endpoint = 0
+        for dilution in sample_ods:
+            if sample_ods[dilution] > cut_off:
+                if int(dilution) > endpoint:
+                    endpoint = int(dilution)
+        endpoint_dilution[sample] = endpoint
+        dilutions = list(sample_cvs.keys())
+        dilutions = sorted([int(i) for i in dilutions])
+        dilution_num = dilutions.index(endpoint)
+        ## errors
+        cv_high = 0
+        high_low[sample] = ""
+        for cv in sample_cvs.values():
+            if cv >= 0.1:
+                cv_high += 1
+        if cv_high >= 2:
+            endpoint_error[sample] = "Too many high CVs"
+            continue
+        if cvs[sample_ids[sample]][str(endpoint)] > 0.1:
+            endpoint_error[sample] = "Endpoint high CV"
+            continue
+        if cvs[sample_ids[sample]][str(dilutions[dilution_num-1])] > 0.1:
+                if cvs[sample_ids[sample]][str(dilutions[dilution_num + 1])] > 0.1:
+                    endpoint_error[sample] = "Dilution below and/or above high CV"
+                continue
+        if dilution_num == 0:
+            high_low[sample] = "Lowest dilution"
+            if cvs[sample_ids[sample]][str(dilutions[1])] > 0.1:
+                endpoint_error[sample] = "Dilution above high CV"
+                continue
+        if dilution_num == len(dilutions) - 1:
+            high_low[sample] = "Highest dilution"
+            if cvs[sample_ids[sample]][str(dilutions[dilution_num -1])] > 0.1:
+                endpoint_error[sample] = "Dilution below high CV"
+                continue
+        endpoint_error[sample] = "PASS"
 
-### Fit standard curve using 4 parameter logistic regression ###
-    print("Fitting standard curve")
-    x = np.asarray(std_concs)
-
-    std_curve1_ods = np.asarray(list(ods["std_curve1"].values()))
-    std_curve2_ods = np.asarray(list(ods["std_curve2"].values()))
-
-    y = (std_curve1_ods + std_curve2_ods) / 2.0
-
-    # Initial guess for parameters
-    p0 = [0, 1, 1, 1]
-
-    # Fit equation using least squares optimization
-    plsq = leastsq(residuals, p0, args=(y, x))
-
-    # Plot results
-    plt.plot(x, peval(x, plsq[0]))
-    plt.plot(x, std_curve1_ods, '.', color='orange')
-    plt.plot(x, std_curve2_ods, '.', color='orange')
-
-    plt.xscale("log", basex=10)
-    plt.title("Standard curve")
-    plt.xlabel("Unit of standard")
-    plt.ylabel("OD")
-
-    fig_name = plate_id + ".png"
-    fig_path = os.path.join("figs", fig_name)
-
-    plt.savefig(fig_path)
-
-
-### calculate output variables###
-
-    print("Calculating concentrations")
-    sample_means = {}
-    sample_concs = {}
-    pos_neg = {}
-
-    for sample in ods.keys():
-        if "sample" in sample:
-            sample_ods = np.asarray(list(ods[sample].values()))
-            mean = sum(sample_ods)/len(sample_ods)
-            sample_concs[sample] = round(get_conc(mean, plsq[0]), 6)
-            sd = np.std(sample_ods)
-            cv = sd/mean
-
-            if mean < y[-1]:
-                sample_concs[sample] = "BelowCurve"
-            elif mean > y[0]:
-                sample_concs[sample] = "AboveCurve"
-
-            sample_means[sample] = round(mean, 3)
-            #sample_cv[sample] = round(cv, 2)
-
-            if sample_means[sample].item() > cut_offs[antigen]:
-                pos_neg[sample] = "Pos"
-            else:
-                pos_neg[sample] = "Neg"
-
-
-    #Calculate CV of each standard
-    std1_as_list = list(ods["std_curve1"].values())
-    std2_as_list = list(ods["std_curve2"].values())
-
-    std_cvs = {}
-    for std in std1_as_list:
-        list_pos = std1_as_list.index(std)
-        st_mean = (std1_as_list[list_pos] + std2_as_list[list_pos])/2
-        std_ods = np.asarray([std1_as_list[list_pos], std2_as_list[list_pos]])
-        st_dev = np.std(std_ods)
-        st_cv = st_dev/st_mean
-        std_cvs["Std" + str(list_pos+1)] = st_cv
-
-    bad_stds = {}
-    for std in std_cvs.keys():
-        if std_cvs[std] >= 0.1:
-            bad_stds[std] = round(std_cvs[std], 3)
 
 ### determine conditional output text ###
-
-    if len(bad_stds) == 0:
-        std_text = "all standards have a CV <0.1"
-    else:
-        std_text = "all standard CVs <0.1 except: %s" % str(bad_stds)
-
     ignore_wells = dict(zip(badwells, badwells_group))
-
     if len(badwells) == 0:
         ignore_text = "No wells exlcuded"
     else:
@@ -226,7 +174,6 @@ if __name__ == "__main__":
     html_page = html % (plate_id,
                             date,
                             antigens[antigen],
-                            fig_path,
                             str(cut_offs[antigen]),
                             round(blk_mean, 3),
                             round(blk_cv, 3),
@@ -237,202 +184,50 @@ if __name__ == "__main__":
                             round(mean_cv("neg")[0], 3),
                             round(mean_cv("neg")[1], 3),
 
-                            std_text,
-
                             ignore_text,
 
-                            sample_dilution["sample01"].split("-")[0],
-                                sample_means["sample01"],
-                                sample_cv["sample01"],
-                                sample_concs["sample01"],
-                                pos_neg["sample01"],
+                            sample_ids["sample01"],
+                                endpoint_dilution["sample01"],
+                                cvs[sample_ids["sample01"]][str(endpoint_dilution["sample01"])],
+                                endpoint_error["sample01"],
+                                high_low["sample01"],
 
-                            sample_dilution["sample02"].split("-")[0],
-                                sample_means["sample02"],
-                                sample_cv["sample02"],
-                                sample_concs["sample02"],
-                                pos_neg["sample02"],
+                            sample_ids["sample02"],
+                                endpoint_dilution["sample02"],
+                                cvs[sample_ids["sample02"]][str(endpoint_dilution["sample02"])],
+                                endpoint_error["sample02"],
+                                high_low["sample02"],
 
-                            sample_dilution["sample03"].split("-")[0],
-                                sample_means["sample03"],
-                                sample_cv["sample03"],
-                                sample_concs["sample03"],
-                                pos_neg["sample03"],
+                            sample_ids["sample03"],
+                                endpoint_dilution["sample03"],
+                                cvs[sample_ids["sample03"]][str(endpoint_dilution["sample03"])],
+                                endpoint_error["sample03"],
+                                high_low["sample03"],
 
-                            sample_dilution["sample04"].split("-")[0],
-                                sample_means["sample04"],
-                                sample_cv["sample04"],
-                                sample_concs["sample04"],
-                                pos_neg["sample04"],
+                            sample_ids["sample04"],
+                                endpoint_dilution["sample04"],
+                                cvs[sample_ids["sample04"]][str(endpoint_dilution["sample04"])],
+                                endpoint_error["sample04"],
+                                high_low["sample04"],
 
-                            sample_dilution["sample05"].split("-")[0],
-                                sample_means["sample05"],
-                                sample_cv["sample05"],
-                                sample_concs["sample05"],
-                                pos_neg["sample05"],
+                            sample_ids["sample05"],
+                                endpoint_dilution["sample05"],
+                                cvs[sample_ids["sample05"]][str(endpoint_dilution["sample05"])],
+                                endpoint_error["sample05"],
+                                high_low["sample05"],
 
-                            sample_dilution["sample06"].split("-")[0],
-                                sample_means["sample06"],
-                                sample_cv["sample06"],
-                                sample_concs["sample06"],
-                                pos_neg["sample06"],
+                            sample_ids["sample06"],
+                                endpoint_dilution["sample06"],
+                                cvs[sample_ids["sample06"]][str(endpoint_dilution["sample06"])],
+                                endpoint_error["sample06"],
+                                high_low["sample06"],
 
-                            sample_dilution["sample07"].split("-")[0],
-                                sample_means["sample07"],
-                                sample_cv["sample07"],
-                                sample_concs["sample07"],
-                                pos_neg["sample07"],
+                            sample_ids["sample07"],
+                                endpoint_dilution["sample07"],
+                                cvs[sample_ids["sample07"]][str(endpoint_dilution["sample07"])],
+                                endpoint_error["sample07"],
+                                high_low["sample07"]
 
-                            sample_dilution["sample08"].split("-")[0],
-                                sample_means["sample08"],
-                                sample_cv["sample08"],
-                                sample_concs["sample08"],
-                                pos_neg["sample08"],
-
-                            sample_dilution["sample09"].split("-")[0],
-                                sample_means["sample09"],
-                                sample_cv["sample09"],
-                                sample_concs["sample09"],
-                                pos_neg["sample09"],
-
-                            sample_dilution["sample10"].split("-")[0],
-                                sample_means["sample10"],
-                                sample_cv["sample10"],
-                                sample_concs["sample10"],
-                                pos_neg["sample10"],
-
-                            sample_dilution["sample11"].split("-")[0],
-                                sample_means["sample11"],
-                                sample_cv["sample11"],
-                                sample_concs["sample11"],
-                                pos_neg["sample11"],
-
-                            sample_dilution["sample12"].split("-")[0],
-                                sample_means["sample12"],
-                                sample_cv["sample12"],
-                                sample_concs["sample12"],
-                                pos_neg["sample12"],
-
-                            sample_dilution["sample13"].split("-")[0],
-                                sample_means["sample13"],
-                                sample_cv["sample13"],
-                                sample_concs["sample13"],
-                                pos_neg["sample13"],
-
-                            sample_dilution["sample14"].split("-")[0],
-                                sample_means["sample14"],
-                                sample_cv["sample14"],
-                                sample_concs["sample14"],
-                                pos_neg["sample14"],
-
-                            sample_dilution["sample15"].split("-")[0],
-                                sample_means["sample15"],
-                                sample_cv["sample15"],
-                                sample_concs["sample15"],
-                                pos_neg["sample15"],
-
-                            sample_dilution["sample16"].split("-")[0],
-                                sample_means["sample16"],
-                                sample_cv["sample16"],
-                                sample_concs["sample16"],
-                                pos_neg["sample16"],
-
-                            sample_dilution["sample17"].split("-")[0],
-                                sample_means["sample17"],
-                                sample_cv["sample17"],
-                                sample_concs["sample17"],
-                                pos_neg["sample17"],
-
-                            sample_dilution["sample18"].split("-")[0],
-                                sample_means["sample18"],
-                                sample_cv["sample18"],
-                                sample_concs["sample18"],
-                                pos_neg["sample18"],
-
-                            sample_dilution["sample19"].split("-")[0],
-                                sample_means["sample19"],
-                                sample_cv["sample19"],
-                                sample_concs["sample19"],
-                                pos_neg["sample19"],
-
-
-                            sample_dilution["sample20"].split("-")[0],
-                                sample_means["sample20"],
-                                sample_cv["sample20"],
-                                sample_concs["sample20"],
-                                pos_neg["sample20"],
-
-                            sample_dilution["sample21"].split("-")[0],
-                                sample_means["sample21"],
-                                sample_cv["sample21"],
-                                sample_concs["sample21"],
-                                pos_neg["sample21"],
-
-                            sample_dilution["sample22"].split("-")[0],
-                                sample_means["sample22"],
-                                sample_cv["sample22"],
-                                sample_concs["sample22"],
-                                pos_neg["sample22"],
-
-                            sample_dilution["sample23"].split("-")[0],
-                                sample_means["sample23"],
-                                sample_cv["sample23"],
-                                sample_concs["sample23"],
-                                pos_neg["sample23"],
-
-                            sample_dilution["sample24"].split("-")[0],
-                                sample_means["sample24"],
-                                sample_cv["sample24"],
-                                sample_concs["sample24"],
-                                pos_neg["sample24"],
-
-                            sample_dilution["sample25"].split("-")[0],
-                                sample_means["sample25"],
-                                sample_cv["sample25"],
-                                sample_concs["sample25"],
-                                pos_neg["sample25"],
-
-                            sample_dilution["sample26"].split("-")[0],
-                                sample_means["sample26"],
-                                sample_cv["sample26"],
-                                sample_concs["sample26"],
-                                pos_neg["sample26"],
-
-                            sample_dilution["sample27"].split("-")[0],
-                                sample_means["sample27"],
-                                sample_cv["sample27"],
-                                sample_concs["sample27"],
-                                pos_neg["sample27"],
-
-                            sample_dilution["sample28"].split("-")[0],
-                                sample_means["sample28"],
-                                sample_cv["sample28"],
-                                sample_concs["sample28"],
-                                pos_neg["sample28"],
-
-                            sample_dilution["sample29"].split("-")[0],
-                                sample_means["sample29"],
-                                sample_cv["sample29"],
-                                sample_concs["sample29"],
-                                pos_neg["sample29"],
-
-                            sample_dilution["sample30"].split("-")[0],
-                                sample_means["sample30"],
-                                sample_cv["sample30"],
-                                sample_concs["sample30"],
-                                pos_neg["sample30"],
-
-                            sample_dilution["sample31"].split("-")[0],
-                                sample_means["sample31"],
-                                sample_cv["sample31"],
-                                sample_concs["sample31"],
-                                pos_neg["sample31"],
-
-                            sample_dilution["sample32"].split("-")[0],
-                                sample_means["sample32"],
-                                sample_cv["sample32"],
-                                sample_concs["sample32"],
-                                pos_neg["sample32"]
                             )
 
     html_file = plate_id + ".html"
@@ -452,23 +247,13 @@ if __name__ == "__main__":
     csv_file = plate_id + ".csv"
 
     with open(csv_file, "w") as csvfile:
-        csvfile.write("sampleid, dilution, od, cv, abunits, posneg\n")
-        for sample in ods.keys():
-            if "sample" in sample:
-                if sample_dilution[sample].split("-")[0] != "EMPTY":
-                    csvfile.write(sample_dilution[sample].split("-")[0]
-                                  + ", " + sample_dilution[sample].split("-")[1]
-                                  + ", " + str(sample_means[sample])
-                                  + ", " + str(sample_cv[sample])
-                                  + ", " + str(sample_concs[sample])
-                                  + ", " + pos_neg[sample] + "\n")
-                else:
-                    csvfile.write(sample_dilution[sample]
-                                  + ", NA"
-                                  + ", " + str(sample_means[sample])
-                                  + ", " + str(sample_cv[sample])
-                                  + ", " + str(sample_concs[sample])
-                                  + ", " + pos_neg[sample] + "\n")
+        csvfile.write("sampleid, dilution, cv, qc, comments\n")
+        for sample in sample_ids.keys():
+            csvfile.write(sample_ids[sample]
+                          + ", " + str(endpoint_dilution[sample])
+                          + ", " + str(cvs[sample_ids[sample]][str(endpoint_dilution[sample])])
+                          + ", " + endpoint_error[sample]
+                          + ", " +  high_low[sample] + "\n")
 
 
 
