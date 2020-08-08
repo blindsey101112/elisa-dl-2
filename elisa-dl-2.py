@@ -129,7 +129,12 @@ if __name__ == "__main__":
         endpoint_dilution[sample] = endpoint
         dilutions = list(sample_cvs.keys())
         dilutions = sorted([int(i) for i in dilutions])
-        dilution_num = dilutions.index(endpoint)
+        if endpoint != 0:
+            dilution_num = dilutions.index(endpoint)
+        else:
+            dilution_num = "NA"
+            endpoint_dilution[sample] = "NA"
+
         ## errors
         cv_high = 0
         high_low[sample] = ""
@@ -139,12 +144,18 @@ if __name__ == "__main__":
         if cv_high >= 2:
             endpoint_error[sample] = "Too many high CVs"
             continue
+        if dilution_num == "NA":
+            endpoint_error[sample] = "Endpoint below titration"
+            cvs[sample_ids[sample]]["NA"] = "NA"
+            continue
         if cvs[sample_ids[sample]][str(endpoint)] > 0.1:
             endpoint_error[sample] = "Endpoint high CV"
             continue
         if cvs[sample_ids[sample]][str(dilutions[dilution_num-1])] > 0.1:
                 if cvs[sample_ids[sample]][str(dilutions[dilution_num + 1])] > 0.1:
                     endpoint_error[sample] = "Dilution below and/or above high CV"
+                else:
+                    endpoint_error[sample] = "PASS"
                 continue
         if dilution_num == 0:
             high_low[sample] = "Lowest dilution"
@@ -157,7 +168,6 @@ if __name__ == "__main__":
                 endpoint_error[sample] = "Dilution below high CV"
                 continue
         endpoint_error[sample] = "PASS"
-
 
 ### determine conditional output text ###
     ignore_wells = dict(zip(badwells, badwells_group))
