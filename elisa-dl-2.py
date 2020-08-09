@@ -246,7 +246,6 @@ if __name__ == "__main__":
     with open(plate_id + ".html", 'w') as htmlfile:
         htmlfile.write(html_page)
 
-
     print("Converting html to pdf...")
     pdfkit.from_file(html_file, pdf_file)
 
@@ -257,13 +256,19 @@ if __name__ == "__main__":
     csv_file = plate_id + ".csv"
 
     with open(csv_file, "w") as csvfile:
-        csvfile.write("sampleid, dilution, cv, qc, comments\n")
+        csvfile.write("sampleid, dilution, od, cv, qc, comments\n")
         for sample in sample_ids.keys():
-            csvfile.write(sample_ids[sample]
+           if endpoint_dilution[sample] == "NA":
+                csvfile.write(sample_ids[sample]
+                          + ", NA"
+                          + ", NA"
+                          + ", NA"
+                          + ", " + endpoint_error[sample]
+                          + ", " +  high_low[sample] + "\n")
+           else:
+                csvfile.write(sample_ids[sample]
                           + ", " + str(endpoint_dilution[sample])
+                          + ", " + str(dilution_ods[sample_ids[sample]][str(endpoint_dilution[sample])])
                           + ", " + str(cvs[sample_ids[sample]][str(endpoint_dilution[sample])])
                           + ", " + endpoint_error[sample]
                           + ", " +  high_low[sample] + "\n")
-
-
-
