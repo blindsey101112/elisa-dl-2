@@ -11,7 +11,7 @@ This should run off linux, mac and windows but I have only tested it in windows 
 
 ### Install elisa-dl 
 
-1. Clone this repository and ``cd elisa-dl``
+1. Clone this repository and ``cd elisa-dl-2``
 2. ``conda env create -f environment.yml``
 
 If you get an error message related to wkhtmltopdf then:
@@ -26,7 +26,7 @@ If you get an error message related to wkhtmltopdf then:
 1. For now you have to be with in the elisa-dl directory
 2. ``conda activate elisa-dl``
 3. ``python elisa_dl.py plateID antigen`` In place of 'antigen' type "s" or "n" for Spike or Nucleoprotein
-5. You can do a test run with ``python elisa_dl.py test``
+5. You can do a test run with ``python elisa_dl-2.py test`` 
 6. Onced finished ``conda deactivate`` to exit the environment
 
 ### Output
