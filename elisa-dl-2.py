@@ -158,9 +158,9 @@ if __name__ == "__main__":
                     endpoint_error[sample] = "PASS"
                 continue
         if dilution_num == 0:
-            high_low[sample] = "Lowest dilution"
             if cvs[sample_ids[sample]][str(dilutions[1])] > 0.1:
                 endpoint_error[sample] = "Dilution above high CV"
+                high_low[sample] = "Lowest dilution"
                 continue
         if dilution_num == len(dilutions) - 1:
             high_low[sample] = "Highest dilution"
