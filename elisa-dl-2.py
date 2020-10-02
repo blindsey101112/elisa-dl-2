@@ -17,7 +17,7 @@ def mean_cv(group):
 
 antigens = {"s" : "Spike", "n" : "Nucleocapsid"}
 
-cut_offs = {"s" : 0.175, "n" : 0.722}
+cut_offs = {"s" : 0.175, "n" : 0.722, "n2": 0.1905}
 
 if __name__ == "__main__":
     sys.path.insert(1, './scripts')
