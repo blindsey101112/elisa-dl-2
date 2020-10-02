@@ -15,7 +15,7 @@ def mean_cv(group):
     group_cv = group_sd / group_mean
     return [group_mean, group_cv]
 
-antigens = {"s" : "Spike", "n" : "Nucleocapsid"}
+antigens = {"s" : "Spike", "n" : "Nucleocapsid", "n2": "Nucleocapsid2"}
 
 cut_offs = {"s" : 0.175, "n" : 0.722, "n2": 0.1905}
 
