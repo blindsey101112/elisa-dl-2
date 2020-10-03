@@ -25,9 +25,11 @@ If you get an error message related to wkhtmltopdf then:
 
 1. For now you have to be with in the elisa-dl directory
 2. ``conda activate elisa-dl``
-3. ``python elisa_dl.py plateID antigen`` In place of 'antigen' type "s" or "n" for Spike or Nucleoprotein
-5. You can do a test run with ``python elisa_dl-2.py test`` 
+3. ``python elisa-dl.py plateID antigen`` In place of 'antigen' type "s" or "n" for Spike or Nucleoprotein
+5. You can do a test run with ``python elisa-dl-2.py test`` 
 6. Onced finished ``conda deactivate`` to exit the environment
+
+If running the oral fluid elisa, replace elisa_dl.py with elisa-dl-od.py.
 
 ### Output
 This should automatically generate a report named *plateID*.pdf to inspect the standard curve and see the sample concentrations.
