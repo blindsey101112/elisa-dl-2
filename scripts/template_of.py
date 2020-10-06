@@ -32,7 +32,8 @@ html = """
  <p class="centre"><img src="%s" alt="Standard curve" width="450" height="350"/></p>
 
  <p style="font-size:12px"> <b>OD cutoff</b> %s</p>   
- <p style="font-size:12px"> <b>Blanks</b>  mean: %s   CV: %s</p>
+ <p style="font-size:12px"> <b>Blanks Total</b>  mean: %s   CV: %s</p>
+ <p style="font-size:12px"> <b>Blanks Spike</b>  mean: %s   CV: %s</p>
  <p style="font-size:12px"> <b>Positive control </b>  mean: %s   CV: %s</p>
  <p style="font-size:12px"> <b>Negative control</b>  mean: %s   CV: %s</p>
  <p style="font-size:12px"> <b>Standards</b>  %s</p>

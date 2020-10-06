@@ -132,13 +132,22 @@ if __name__ == "__main__":
 
 
 ### subtract mean of blanks from all wells ###
-    blk_mean = mean_cv("blk2")[0]
-    blk_cv = mean_cv("blk2")[1]
+    blk_mean1 = mean_cv("blk1")[0]
+    blk_cv1 = mean_cv("blk1")[1]
+    blk_mean2 = mean_cv("blk2")[0]
+    blk_cv2 = mean_cv("blk2")[1]
 
     for group in ods.keys():
-        for well in ods[group].keys():
-            minblk_od = ods[group][well] - blk_mean
-            ods[group][well] = minblk_od
+        if group in ["std_curve1", "std_curve2"]:
+            for well in ods[group].keys():
+                minblk_od = ods[group][well] - blk_mean1
+                ods[group][well] = minblk_od
+        else:
+            for well in ods[group].keys():
+                minblk_od = ods[group][well] - blk_mean2
+                ods[group][well] = minblk_od
+
+
 
 ### Fit standard curve using 4 parameter logistic regression ###
     print("Fitting standard curve")
@@ -248,8 +257,10 @@ if __name__ == "__main__":
                             antigens[antigen],
                             fig_path,
                             str(cut_offs[antigen]),
-                            round(blk_mean, 3),
-                            round(blk_cv, 3),
+                            round(blk_mean1, 3),
+                            round(blk_cv1, 3),
+                            round(blk_mean2, 3),
+                            round(blk_cv2, 3),
 
                             round(mean_cv("pos")[0], 3),
                             round(mean_cv("pos")[1], 3),
