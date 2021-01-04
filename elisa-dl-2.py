@@ -25,6 +25,7 @@ if __name__ == "__main__":
     from plate_plans import get_ods, get_samples
     plate_id = sys.argv[1]
     antigen = sys.argv[2]
+    include_pdf = sys.argv[3]
 
     #read in input files
     plateplan_file = plate_id + "-pplan.xlsx"
@@ -246,6 +247,10 @@ if __name__ == "__main__":
     with open(plate_id + ".html", 'w') as htmlfile:
         htmlfile.write(html_page)
 
+    if include_pdf == "yes":
+        print("Converting html to pdf...")
+        pdfkit.from_file(html_file, pdf_file)
+        
     print("Converting html to pdf...")
     pdfkit.from_file(html_file, pdf_file)
 
