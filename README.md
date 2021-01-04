@@ -25,7 +25,7 @@ If you get an error message related to wkhtmltopdf then:
 
 1. For now you have to be with in the elisa-dl directory
 2. ``conda activate elisa-dl``
-3. ``python elisa-dl.py plateID antigen`` In place of 'antigen' type "s" or "n" for Spike or Nucleoprotein
+3. ``python elisa-dl.py plateID antigen include-pdf`` In place of 'antigen' type "s" or "n" for Spike or Nucleoprotein. In place of include-pdf type "yes" or "no".
 5. You can do a test run with ``python elisa-dl-2.py test`` 
 6. Onced finished ``conda deactivate`` to exit the environment
 
